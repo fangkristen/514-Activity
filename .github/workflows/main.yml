@@ -86,15 +86,4 @@ jobs:
       # Step 6: Apply the infrastructure changes
       - name: Terraform Apply
         run: terraform apply -auto-approve # Auto-approve flag skips manual confirmation
-
-      - name: Terraform State
-        run: terraform {
-              backend "s3" {
-                bucket         = "kf-github-activity"
-                key            = "github-actions/terraform.tfstate"
-                region         = "us-east-1"
-                encrypt        = true
-              }
-            }
-    
         
