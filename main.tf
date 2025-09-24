@@ -1,63 +1,39 @@
 provider "aws" {
-  region = "us-east-1"  # Set AWS region to US East 1 (N. Virginia)
+  region = "us-east-1"
 }
 
-locals {
-  aws_key = "KF_AWS_KEY"   # SSH key pair name for EC2 instance access
+module "vpc" {
+  source = "./modules/vpc"
 }
 
-# Get the default VPC (needed for security group)
-data "aws_vpc" "default" {
-  default = true
+module "subnets" {
+  source = "./modules/subnets"
+  vpc_id = module.vpc.vpc_id
 }
 
-# Security Group to allow browser + SSH
-resource "aws_security_group" "web_sg" {
-  name        = "web-sg"
-  description = "Allow web and SSH access"
-  vpc_id      = data.aws_vpc.default.id
-
-  ingress {
-    description = "Allow HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "Allow SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # 🔒 Ideally restrict to your IP
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+module "internet_gateway" {
+  source = "./modules/internet_gateway"
+  vpc_id = module.vpc.vpc_id
+  public_subnet_id = module.subnets.public_subnet_id
 }
 
-# EC2 instance resource definition
-resource "aws_instance" "my_server" {
-  ami             = data.aws_ami.amazonlinux.id
-  instance_type   = var.instance_type
-  key_name        = local.aws_key
-  security_groups = [aws_security_group.web_sg.name]
-
-  # Run the WordPress install script on boot
-  user_data = file("${path.module}/wp_install.sh")
-
-  tags = {
-    Name = "my-ec2"
-  }
+module "security_groups" {
+  source = "./modules/security_groups"
+  vpc_id = module.vpc.vpc_id
 }
 
-# Output the EC2 public IP
-output "public_ip" {
-  description = "Public IP address of the EC2 instance"
-  value       = aws_instance.my_server.public_ip
+module "ec2" {
+  source     = "./modules/ec2"
+  subnet_id  = module.subnets.public_subnet_id
+  ec2_sg_id  = module.security_groups.ec2_sg_id
+  key_name   = var.key_name
+}
+
+module "rds" {
+  source            = "./modules/rds"
+  private_subnet_id = module.subnets.private_subnet_id
+  public_subnet_id  = module.subnets.public_subnet_id
+  rds_sg_id         = module.security_groups.rds_sg_id
+  db_username       = var.db_username
+  db_password       = var.db_password
 }
