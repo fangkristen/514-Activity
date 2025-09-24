@@ -1,39 +1,21 @@
+# Configure the AWS Provider
 provider "aws" {
-  region = "us-east-1"
+  region = "us-east-1"  # Set AWS region to US East 1 (N. Virginia)
 }
 
-module "vpc" {
-  source = "./modules/vpc"
+# Local variables block for configuration values
+locals {
+    aws_key = "<YOUR-KEY-NAME>"   # SSH key pair name for EC2 instance access
 }
 
-module "subnets" {
-  source = "./modules/subnets"
-  vpc_id = module.vpc.vpc_id
-}
-
-module "internet_gateway" {
-  source = "./modules/internet_gateway"
-  vpc_id = module.vpc.vpc_id
-  public_subnet_id = module.subnets.public_subnet_id
-}
-
-module "security_groups" {
-  source = "./modules/security_groups"
-  vpc_id = module.vpc.vpc_id
-}
-
-module "ec2" {
-  source     = "./modules/ec2"
-  subnet_id  = module.subnets.public_subnet_id
-  ec2_sg_id  = module.security_groups.ec2_sg_id
-  key_name   = var.key_name
-}
-
-module "rds" {
-  source            = "./modules/rds"
-  private_subnet_id = module.subnets.private_subnet_id
-  public_subnet_id  = module.subnets.public_subnet_id
-  rds_sg_id         = module.security_groups.rds_sg_id
-  db_username       = var.db_username
-  db_password       = var.db_password
+# EC2 instance resource definition
+resource "aws_instance" "my_server" {
+   ami           = data.aws_ami.amazonlinux.id  # Use the AMI ID from the data source
+   instance_type = var.instance_type            # Use the instance type from variables
+   key_name      = "${local.aws_key}"          # Specify the SSH key pair name
+  
+   # Add tags to the EC2 instance for identification
+   tags = {
+     Name = "my ec2"
+   }                  
 }
